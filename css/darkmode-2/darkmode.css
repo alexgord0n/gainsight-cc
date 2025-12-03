@@ -1,0 +1,122 @@
+/* ============================================
+   Plug-and-Play Dark Mode for Gainsight Community
+   ============================================ */
+
+/* ---------- CSS Variables ---------- */
+:root {
+  --color-black: #000;
+  --color-dark-gray: #121212;
+  --color-border-gray: #666666;
+  --color-white: #fff;
+  --color-link-hover: #1c73e8;
+}
+
+/* ---------- Universal Dark Background ---------- */
+body,
+.public-tag-list-container, .topic-view, .control-modal, .algolia-hit-container,
+.load-more-container, .event-header-container, .event-content-container, 
+.event-details-container, .event-attendees-container, .post, .topic__header,
+.box__pad, .topic-replies__wrapper, .qa-reply-sort-dropdown, .list__items--header,
+.dropdown-links, .category-list__container, .topic-curation__list, .ask-question-widget__widget,
+.form-control, .quick-links-manager, .quick-links-manager__add-quick-link-form,
+.featured-topic__listed-view-url-link-text, .smart-summary, .topic-card-wrapper,
+.featured-topic__listed-view-item, .dropdown, .qa-stats-bar, .topic-helpfulness_container,
+.dropdown-selector, .dropdown-selector__item, .dropdown-selector__header, .main-menu-link__name,
+.boxes > .box, .pipeline__column-wrapper, .chip, .community-modal, .language-preference-modal,
+.mfp-wrap .mfp-inline-holder .mfp-content, .notification-center__panel, .dropdown-container ul li,
+.twig_default-setting-profile .sections__nav ul.tabs--navigation,
+.twig_default-settings-email .sections__nav ul.tabs--navigation,
+.twig_default-settings-general .sections__nav ul.tabs--navigation {
+  background-color: var(--config-body-background-color) !important;
+  color: var(--color-white) !important;
+}
+
+/* ---------- Transparent Elements ---------- */
+.topic-list-item-card_topic-metrics,
+.topic-curation__item-link,
+.ask-question-widget__widget {
+  background-color: transparent !important;
+}
+
+/* ---------- Dropdown Styling ---------- */
+.dropdown {
+  background: var(--config-body-background-color);
+  border: none;
+  box-shadow: 1px 2px 2px hsla(0, 0%, 39.2%, .2);
+}
+
+/* ---------- CKEditor Dialog ---------- */
+.cke_panel_listItem a,
+.cke_selected.cke_panel_listItem a,
+.cke_panel_listItem a:hover,
+.cke_panel_listItem a:focus,
+.cke_panel_listItem a:active,
+.cke_dialog .cke_dialog_body .cke_dialog_contents_body,
+.cke_reset_all,
+.cke_reset_all * {
+  color: var(--config-body-background-color) !important;
+}
+
+/* ---------- Search Tweaks ---------- */
+.algolia-search-results-section__title-label,
+.modal-header-title {
+  color: var(--color-white) !important;
+}
+
+.algolia-search-results li:hover {
+  background-color: #1a1a1a !important;
+}
+
+/* ---------- Tags ---------- */
+.tag--pill {
+  background-color: #333 !important;
+  color: #e0e0e0 !important;
+  border: 1px solid #444 !important;
+  padding: 6px 12px !important;
+  border-radius: 20px !important;
+  transition: all 0.3s ease-in-out;
+}
+
+.tag--pill:hover {
+  background-color: #fff !important;
+  color: #ffcc00 !important;
+  border-color: #ffcc00 !important;
+  box-shadow: 0 0 3px #ffcc00 !important;
+}
+
+/* ---------- Code Styling ---------- */
+.post__content--new-editor pre code.hljs,
+.post__content--new-editor p code:not(.hljs),
+.post__content--new-editor li code:not(.hljs),
+.post__content--new-editor span code:not(.hljs) {
+  background-color: #040404 !important;
+  color: #e0e0e0 !important;
+  border: 1px solid #ffc61f !important;
+  border-radius: 10px !important;
+  padding: 6px 12px !important;
+  display: block;
+  overflow-x: auto;
+}
+
+/* Inline code */
+.post__content--new-editor p code:not(.hljs),
+.post__content--new-editor li code:not(.hljs),
+.post__content--new-editor span code:not(.hljs) {
+  display: inline;
+  padding: 0px 6px !important;
+  margin: 2px !important;
+}
+
+.hljs-keyword { color: #4a637e !important; }
+.hljs-tag { color: #003cff !important; }
+.hljs-symbol { color: #d600a1 !important; }
+.hljs-title { color: #553fb6 !important; }
+
+/* ---------- Username and Rank Divider ---------- */
+.user-title::before,
+.qa-usertitle::before {
+  content: "|";
+  margin: 0 8px 0 8px;
+  font-style: normal;
+  color: var(--color-border-gray);
+}
