@@ -1,4 +1,4 @@
-// calendar-widget-brand-bundle.js
+// calendar-brand-bundle.js
 // Brand-based Schedule-X calendar bundle for CC
 (function () {
   console.log('[GS CAL] brand bundle loaded');
@@ -102,29 +102,6 @@
     document.head.appendChild(style);
   }
 
-  // ---- Ensure wrapper exists (if you ever want .calendar-wrapper) ----
-  function ensureWrapper() {
-    let wrapper = document.querySelector('.calendar-wrapper');
-    let cal = document.getElementById('gs-calendar');
-
-    if (!cal) {
-      cal = document.createElement('div');
-      cal.id = 'gs-calendar';
-    }
-
-    if (!wrapper) {
-      wrapper = document.createElement('div');
-      wrapper.className = 'calendar-wrapper';
-      wrapper.appendChild(cal);
-      const target = document.currentScript
-        ? document.currentScript.parentElement
-        : document.body;
-      target.insertBefore(wrapper, document.currentScript);
-    } else if (!wrapper.contains(cal)) {
-      wrapper.appendChild(cal);
-    }
-  }
-
   // ---- Date formatting ----
   function formatForScheduleX(isoString) {
     if (!isoString) return null;
@@ -151,7 +128,7 @@
 
       const eventsArray = result.result || [];
 
-      const mapped = eventsArray.map((evt, index) => {
+      return eventsArray.map((evt, index) => {
         const start = formatForScheduleX(evt.startDate);
         const end   = formatForScheduleX(evt.endDate);
 
@@ -165,9 +142,6 @@
           }
         };
       });
-
-      console.log('[GS CAL] Final mapped events:', mapped);
-      return mapped;
     } catch (err) {
       console.error('[GS CAL] Error calling get-calendar-events connector', err);
       return [];
@@ -178,28 +152,27 @@
   async function initCalendar() {
     console.log('[GS CAL] initCalendar (brand)');
 
-    if (!window.SXCalendar) {
-      console.error('[GS CAL] window.SXCalendar is not available');
+    const calEl = document.getElementById('gs-calendar');
+    if (!calEl) {
+      console.error('[GS CAL] #gs-calendar not found in DOM');
       return;
     }
 
-    ensureWrapper();
+    if (!window.SXCalendar) {
+      console.error('[GS CAL] window.SXCalendar is not available at init time');
+      return;
+    }
+
     injectStyles();
 
-    var calendarEl = document.getElementById('gs-calendar');
-    if (!calendarEl) {
-      console.error('[GS CAL] #gs-calendar not found after ensureWrapper');
-      return;
-    }
+    const SX             = window.SXCalendar;
+    const createCalendar = SX.createCalendar;
 
-    var SX             = window.SXCalendar;
-    var createCalendar = SX.createCalendar;
+    const viewMonthGrid = SX.viewMonthGrid;
+    const viewWeek      = SX.viewWeek || null;
+    const viewDay       = SX.viewDay  || null;
 
-    var viewMonthGrid = SX.viewMonthGrid;
-    var viewWeek      = SX.viewWeek || null;
-    var viewDay       = SX.viewDay  || null;
-
-    var views = [];
+    const views = [];
     if (viewMonthGrid) views.push(viewMonthGrid);
     if (viewWeek)      views.push(viewWeek);
     if (viewDay)       views.push(viewDay);
@@ -209,14 +182,14 @@
       return;
     }
 
-    var defaultViewName =
+    const defaultViewName =
       (viewWeek && viewWeek.name) ||
       (viewMonthGrid && viewMonthGrid.name) ||
       views[0].name;
 
-    var events = await fetchCommunityEvents();
+    const events = await fetchCommunityEvents();
 
-    var calendar = createCalendar({
+    const calendar = createCalendar({
       views: views,
       defaultView: defaultViewName,
       events: events,
@@ -229,16 +202,16 @@
       },
       callbacks: {
         onEventClick: function (payload) {
-          var evt = payload && (payload.calendarEvent || payload.event || payload);
-          var id  = evt && (evt.id || (evt.meta && evt.meta.id));
+          const evt = payload && (payload.calendarEvent || payload.event || payload);
+          const id  = evt && (evt.id || (evt.meta && evt.meta.id));
 
           if (!id) {
             console.warn('[GS CAL] onEventClick: no id found in payload', payload);
             return;
           }
 
-          var baseUrl = window.location.origin;
-          var url     = baseUrl + '/events/' + id;
+          const baseUrl = window.location.origin;
+          const url     = baseUrl + '/events/' + id;
 
           console.log('[GS CAL] onEventClick resolved URL:', url, payload);
           window.location.href = url;
@@ -246,7 +219,7 @@
       }
     });
 
-    calendar.render(calendarEl);
+    calendar.render(calEl);
 
     console.log(
       '[GS CAL] calendar rendered (brand) with views:',
@@ -258,13 +231,36 @@
     );
   }
 
-  function scheduleInit() {
-    setTimeout(initCalendar, 800);
+  // ---- Wait until deps are ready (SXCalendar + WidgetServiceSDK) ----
+  function waitForDepsAndInit() {
+    const maxTries = 40; // ~4s
+    let tries = 0;
+
+    const timer = setInterval(() => {
+      tries++;
+
+      const hasSX  = !!window.SXCalendar;
+      const hasSDK = !!window.WidgetServiceSDK;
+      const hasCal = !!document.getElementById('gs-calendar');
+
+      if (hasSX && hasSDK && hasCal) {
+        clearInterval(timer);
+        console.log('[GS CAL] deps ready, initializing');
+        initCalendar();
+      } else if (tries >= maxTries) {
+        clearInterval(timer);
+        console.warn('[GS CAL] deps not ready after timeout', {
+          SXCalendar: hasSX,
+          WidgetServiceSDK: hasSDK,
+          calEl: hasCal
+        });
+      }
+    }, 100);
   }
 
   if (document.readyState === 'complete') {
-    scheduleInit();
+    waitForDepsAndInit();
   } else {
-    window.addEventListener('load', scheduleInit);
+    window.addEventListener('load', waitForDepsAndInit);
   }
 })();
