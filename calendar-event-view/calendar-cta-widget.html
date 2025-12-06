@@ -1,0 +1,279 @@
+<div class="calendar-wrapper">
+  <div id="gs-calendar"></div>
+</div>
+
+<style>
+  /* calendar-theme-cta.css */
+/* Schedule-X calendar styling bound to CC CTA button color */
+
+.calendar-wrapper {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+#gs-calendar {
+  height: 650px;
+  max-width: 100%;
+  overflow: hidden;
+
+  /* === Schedule-X theme overrides (bind to CTA button) === */
+
+  /* Main accent color (navigation, focus, selected view, etc.) */
+  --sx-color-primary: var(--config-button-cta-background-color);
+  --sx-color-on-primary: var(--config-button-cta-color, #202124);
+
+  /* Selected / active surfaces (view dropdown active, date picker selection) */
+  --sx-color-primary-container: color-mix(
+    in srgb,
+    var(--config-button-cta-background-color) 15%,
+    var(--config-body-background-color) 85%
+  );
+  --sx-color-on-primary-container: var(--config-button-cta-color, #202124);
+
+  /* Generic surfaces */
+  --sx-color-surface: var(--config-body-background-color);
+  --sx-color-surface-container: var(--config-body-background-color);
+  --sx-color-surface-container-low: var(--config-body-background-color);
+
+  /* Outlines/borders (e.g. date picker border) */
+  --sx-color-outline: var(--config--main-border-base-color);
+  --sx-color-outline-variant: var(--config--main-border-base-color);
+
+  /* Hover “dim” surfaces (chevrons, date-picker hover, etc.) */
+  --sx-color-surface-dim: color-mix(
+    in srgb,
+    var(--config-button-cta-background-color) 10%,
+    var(--config-body-background-color) 90%
+  );
+
+  /* Ripple / subtle gray background */
+  --sx-internal-color-gray-ripple-background: var(--config--main-color-day);
+}
+
+/* Let the Schedule-X calendar stretch to fill our container height */
+#gs-calendar .sx__calendar {
+  height: 100%;
+}
+
+#gs-calendar .sx__time-grid,
+#gs-calendar .sx__grid {
+  height: 100%;
+}
+
+/* Keep text tidy but don't override the font family coming from CC */
+#gs-calendar * {
+  font-size: 14px;
+}
+
+/* Normalize any rotated nav labels inside the calendar */
+#gs-calendar [style*="rotate("] {
+  transform: none !important;
+  writing-mode: horizontal-tb !important;
+}
+
+/* Hide the "Previous period / Next period" text but keep the chevron glyph */
+#gs-calendar .sx__chevron {
+  font-size: 0 !important;
+  line-height: 1;
+}
+
+/* Make events clearly clickable instead of text-selectable */
+#gs-calendar .sx__event,
+#gs-calendar .sx__event * {
+  cursor: pointer;
+}
+
+/* Fix top border clipping on the Date label */
+label.sx__date-input-label {
+  width: fit-content;
+}
+
+/* Ensure the date input uses our outline color on focus */
+#gs-calendar input.sx__date-input:focus {
+  border-color: var(--sx-color-outline) !important;
+}
+
+</style>
+
+<!-- Schedule-X styles -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@schedule-x/theme-default@2.2.0/dist/index.css">
+
+<!-- Preact + signals (Schedule-X dependencies) -->
+<script src="https://cdn.jsdelivr.net/npm/preact@10.23.2/dist/preact.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/preact@10.23.2/hooks/dist/hooks.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@preact/signals-core@1.8.0/dist/signals-core.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@preact/signals@1.3.0/dist/signals.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/preact@10.23.2/jsx-runtime/dist/jsxRuntime.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/preact@10.23.2/compat/dist/compat.umd.js"></script>
+
+<!-- Schedule-X UMD -->
+<script src="https://cdn.jsdelivr.net/npm/@schedule-x/calendar@2.2.0/dist/core.umd.js"></script>
+
+<!-- WidgetServiceSDK for secure connector calls -->
+<script src="https://static.customer-hub.northpass.com/widget-sdk/latest/index.umd.js"></script>
+
+<script>
+  (function () {
+    console.log('[GS CAL] script loaded');
+
+    // Convert ISO string from CC -> "YYYY-MM-DD HH:mm" for Schedule-X
+    function formatForScheduleX(isoString) {
+      if (!isoString) return null;
+
+      // Example: "2025-11-06T01:00:00-07:00"
+      // 1) Replace "T" with space
+      // 2) Take the first 16 chars: "YYYY-MM-DD HH:mm"
+      const withoutT = isoString.replace('T', ' ');  // "2025-11-06 01:00:00-07:00"
+      const trimmed  = withoutT.slice(0, 16);        // "2025-11-06 01:00"
+
+      return trimmed;
+    }
+
+    // ---------- 1) Fetch events from CC via connector ----------
+    async function fetchCommunityEvents() {
+      if (!window.WidgetServiceSDK) {
+        console.error('[GS CAL] WidgetServiceSDK not available');
+        return [];
+      }
+
+      const sdk = new window.WidgetServiceSDK();
+
+      try {
+        const result = await sdk.connectors.execute({
+          permalink: 'get-calendar-events',
+          method: 'GET'
+        });
+
+        console.log('[GS CAL] Raw connector result:', result);
+
+        const eventsArray = result.result || [];
+
+        const mapped = eventsArray.map((evt, index) => {
+          const start = formatForScheduleX(evt.startDate);
+          const end   = formatForScheduleX(evt.endDate);
+
+          return {
+            id: String(evt.id || index),
+            title: evt.title || 'Event',
+
+            // Use "YYYY-MM-DD HH:mm" when we can, otherwise fall back to all-day
+            start: start || (evt.startDate ? evt.startDate.slice(0, 10) : null),
+            end:   end   || (evt.endDate   ? evt.endDate.slice(0, 10)   : null),
+
+            meta: {
+              // Prefer the *internal* event URL, fall back to external reg URL
+              url: evt.url || evt.externalRegistrationUrl || null
+            }
+          };
+        });
+
+        console.log('[GS CAL] Final mapped events:', mapped);
+        return mapped;
+      } catch (err) {
+        console.error('[GS CAL] Error calling get-calendar-events connector', err);
+        return [];
+      }
+    }
+
+    // ---------- 2) Init calendar ----------
+    async function initCalendar() {
+      console.log('[GS CAL] initCalendar called');
+
+      if (!window.SXCalendar) {
+        console.error('[GS CAL] window.SXCalendar is not available');
+        return;
+      }
+
+      var calendarEl = document.getElementById('gs-calendar');
+      if (!calendarEl) {
+        console.error('[GS CAL] #gs-calendar not found');
+        return;
+      }
+
+      var SX             = window.SXCalendar;
+      var createCalendar = SX.createCalendar;
+
+      var viewMonthGrid = SX.viewMonthGrid;
+      var viewWeek      = SX.viewWeek || null;
+      var viewDay       = SX.viewDay  || null;
+
+      var views = [];
+      if (viewMonthGrid) views.push(viewMonthGrid);
+      if (viewWeek)      views.push(viewWeek);
+      if (viewDay)       views.push(viewDay);
+
+      if (!views.length) {
+        console.error('[GS CAL] No views available on SXCalendar');
+        return;
+      }
+
+      // You currently default to week if available, then month.
+      var defaultViewName =
+        (viewWeek && viewWeek.name) ||
+        (viewMonthGrid && viewMonthGrid.name) ||
+        views[0].name;
+
+      var events = await fetchCommunityEvents();
+
+      var calendar = createCalendar({
+        views: views,
+        defaultView: defaultViewName,
+        events: events,
+        isResponsive: true,
+
+        weekOptions: {
+          gridHeight: 900
+        },
+
+        monthGridOptions: {
+          nEventsPerDay: 4
+        },
+
+        callbacks: {
+          onEventClick: function (payload) {
+            // Schedule-X usually passes the calendar event directly, but just in case:
+            var evt = payload && (payload.calendarEvent || payload.event || payload);
+            var id  = evt && (evt.id || (evt.meta && evt.meta.id));
+
+            if (!id) {
+              console.warn('[GS CAL] onEventClick: no id found in payload', payload);
+              return;
+            }
+
+            var baseUrl = window.location.origin; // e.g. "https://gordonhockey-en-community.insided.com"
+            var url     = baseUrl + '/events/' + id;
+
+            console.log('[GS CAL] onEventClick resolved URL:', url, payload);
+            window.location.href = url;
+          }
+        }
+      });
+
+      calendar.render(calendarEl);
+
+      console.log(
+        '[GS CAL] calendar rendered with views:',
+        views,
+        'and events:',
+        events.length,
+        'defaultView:',
+        defaultViewName
+      );
+    }
+
+    function scheduleInit() {
+      setTimeout(initCalendar, 800);
+    }
+
+    if (document.readyState === 'complete') {
+      console.log('[GS CAL] document already complete');
+      scheduleInit();
+    } else {
+      console.log('[GS CAL] waiting for window load');
+      window.addEventListener('load', function () {
+        console.log('[GS CAL] window load fired');
+        scheduleInit();
+      });
+    }
+  })();
+</script>
