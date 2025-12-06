@@ -1,132 +1,183 @@
 # Gainsight CC – Schedule-X Calendar Event View
 
-This folder contains **copy-paste HTML widgets** you can paste directly into a **Gainsight Customer Community (CC)** HTML widget to render a modern Schedule‑X powered calendar.
+This folder contains **copy‑paste HTML widgets** for embedding a modern Schedule‑X calendar inside a **Gainsight Customer Community (CC)** HTML widget.
 
-Two versions are included:
+Two widget variants are provided:
 
-- **calendar-brand-widget.html** — calendar colors follow your **brand color** (`--config--main-color-brand`)
-- **calendar-cta-widget.html** — calendar colors follow your **primary CTA button** (`--config-button-cta-background-color`)
+- **`calendar-brand-widget.html`** — Calendar colors follow your **brand color** (`--config--main-color-brand`)
+- **`calendar-cta-widget.html`** — Calendar colors follow your **CTA button color** (`--config-button-cta-background-color`)
 
-Both versions:
-- Render **Month / Week / Day** views with Schedule‑X  
-- Pull events securely using **CC Secure API Connectors**  
-- Convert CC timestamps into proper Schedule-X timed events  
-- Open community events using `/events/{id}` in the same tab  
-- Match CC UI styling using built‑in CSS variables  
+These widgets:
 
-You do **not** need to host JS/CSS separately or build bundles.  
-Just copy the HTML from the file you want and paste it into an HTML widget.
+- Render **Month / Week / Day** views using Schedule‑X  
+- Load events via **Gainsight CC Secure API Connectors**  
+- Map timestamps into proper timed events  
+- Match CC’s styling using CSS variables  
+- Open events using `/events/{id}` in the same tab  
 
----
-
-## 🚀 How to Use
-
-### 1. Pick a widget flavor  
-Choose which theme logic you want:
-
-- **Brand‑driven UI** → use `calendar-brand-widget.html`  
-- **CTA‑driven UI** → use `calendar-cta-widget.html`  
-
-Both can be swapped anytime by replacing the widget’s contents.
-
-### 2. Copy the full widget  
-Open the file in GitHub → click **Raw** → copy **all** HTML.
-
-### 3. Paste into a CC HTML widget  
-In Gainsight CC:
-
-1. Navigate to the page where you want the calendar (typically Events Overview)  
-2. Add or edit an **HTML widget**  
-3. Paste the full widget HTML  
-4. Save & publish  
-
-The calendar loads automatically once Schedule‑X and the WidgetServiceSDK initialize.
+No external JS hosting is required — copy and paste the widget’s HTML into CC.
 
 ---
 
-## 🔧 Requirements
+# 🚀 How to Use
 
-### A secure CC connector named `get-calendar-events`
+## 1) Choose Your Theme Variant
 
-Your connector should:
+Pick one of the widget files:
 
-- Have permalink: `get-calendar-events`  
-- Use method: `GET`  
-- Return JSON like:
+| File | Description |
+|------|-------------|
+| `calendar-brand-widget.html` | Calendar themed using **brand color** |
+| `calendar-cta-widget.html`   | Calendar themed using **CTA button color** |
+
+You can swap variants at any time by replacing the widget code.
+
+---
+
+# 🔧 Required Setup (Back-end Admin Steps)
+
+Before the calendar widget can load events, you **must** configure:
+
+1. A **CC API Key**
+2. A **Secure API Connector**
+3. CC **Secrets** for client_id / client_secret
+
+Follow these steps exactly.
+
+---
+
+# ✅ Step 1 — Create an API Key in Gainsight CC
+
+1. Go to **Control → Integrations → API Keys**  
+2. Create a new API key  
+3. Copy the:
+   - **Client ID**
+   - **Client Secret**
+
+You’ll use these in Steps 3 and 4.
+
+---
+
+# ✅ Step 2 — Add the Secure API Connector
+
+1. Go to **Control → Integrations → Connectors (Secure)**  
+2. Click **Add Connector** → choose **HTTPS**  
+3. Configure:
+
+```
+Name: Calendar Events
+Permalink: get-calendar-events
+Method: GET
+Base URL: https://<your-community-domain>/api/v2/
+```
+
+4. Set request path, e.g.:
+
+```
+events?sort=upcoming&limit=100
+```
+
+5. Under **Authentication**, choose:  
+   **API Key (client_credentials)**
+
+6. Save the connector.
+
+---
+
+# ✅ Step 3 — Create CC Secrets
+
+Go to **Control → Settings → Secrets** and create two secrets:
+
+### **A. CALENDAR_CLIENT_ID**
+```
+<your Client ID>
+```
+
+### **B. CALENDAR_CLIENT_SECRET**
+```
+<your Client Secret>
+```
+
+---
+
+# ✅ Step 4 — Connect Secrets to the Connector
+
+Edit the `get-calendar-events` connector:
+
+| Connector Field | CC Secret |
+|-----------------|-----------|
+| `client_id`     | `{{ secret:CALENDAR_CLIENT_ID }}` |
+| `client_secret` | `{{ secret:CALENDAR_CLIENT_SECRET }}` |
+
+Save.
+
+Your connector now authenticates securely using CC’s internal secret system.
+
+---
+
+# 🧪 Step 5 — Test Your Connector
+
+Click **Test Request** inside the connector.
+
+You should see:
 
 ```json
 {
   "result": [
     {
       "id": "6",
-      "title": "Grow Boldly with Next‑Gen CPM",
+      "title": "Example Event",
       "startDate": "2025-11-06T01:00:00-07:00",
       "endDate": "2025-11-06T02:00:00-07:00",
-      "url": "",
-      "externalRegistrationUrl": "https://example.com/register"
+      "url": "/events/6"
     }
   ],
   "_metadata": {
-    "totalCount": 1,
-    "offset": 0,
-    "limit": 0
+    "totalCount": 1
   }
 }
 ```
 
-The widget maps:
-- `id`  
-- `title`  
-- `startDate`, `endDate`  
-- `url` or `externalRegistrationUrl` (fallback)  
+If you see event data, you’re ready for the widget installation.
 
 ---
 
-## 🖱 Interaction Behavior
+# 🧩 Step 6 — Install the Calendar Widget
 
-Clicking an event navigates to your built‑in CC event page:
+1. Open the CC page where you want the calendar  
+2. Add an **HTML widget**  
+3. Open one of the widget files:
+   - `calendar-brand-widget.html`
+   - `calendar-cta-widget.html`
+4. Click **Raw** on GitHub  
+5. Copy **everything**  
+6. Paste into the HTML widget  
+7. Save & publish  
 
-```
-https://<community-domain>/events/<id>
-```
-
-This guarantees compatibility even if the connector doesn’t return the internal URL.
-
----
-
-## 🎨 Theming (Brand vs CTA)
-
-### Brand Version
-- Uses `--config--main-color-brand` as the primary accent
-- Best when brand color = the main identity of the community UI
-
-### CTA Version
-- Uses `--config-button-cta-background-color`  
-- Best if your community heavily emphasizes CTA button styling as the accent color
-
-Both rely exclusively on CC global CSS variables.  
-Changing your community’s theme automatically updates the calendar colors.
+The calendar should now render in Month, Week, and Day views with real community events.
 
 ---
 
-## 🧩 Calendar Behavior
+# 🎨 Theming (Brand vs CTA)
 
-Each widget file:
+Both widgets override Schedule‑X's CSS variables:
 
-- Creates the container `<div id="gs-calendar">`
-- Loads all required Schedule‑X + Preact CDN scripts
-- Loads WidgetServiceSDK
-- Fetches event data via your connector
-- Converts timestamps (`YYYY-MM-DDTHH:mm:ssZ`) → Schedule‑X (`YYYY-MM-DD HH:mm`)
-- Renders Month / Week / Day views
-- Opens events by ID in the same tab
+### Brand Variant
+- Primary accent: `--config--main-color-brand`
+- Best if your community uses brand color for navigation and accents
+
+### CTA Variant
+- Primary accent: `--config-button-cta-background-color`
+- Best if your community uses CTA buttons as the main visual anchor
+
+Both will automatically update if your CC theme colors change.
 
 ---
 
-## 🛠 Optional Adjustments
+# 🛠 Optional Tweaks
 
-### Default view  
-Change this block in the script:
+### Default view
+Change:
 
 ```js
 var defaultViewName =
@@ -135,73 +186,66 @@ var defaultViewName =
   views[0].name;
 ```
 
-To default to **Month**, use:
+To force Month:
 
 ```js
 var defaultViewName = 'month-grid';
 ```
 
-### Calendar height  
-In the CSS:
-
+### Calendar height
 ```css
 #gs-calendar {
   height: 650px;
 }
 ```
 
-### Month view event density
-
+### Events per day (Month view)
 ```js
 monthGridOptions: { nEventsPerDay: 4 }
 ```
 
 ---
 
-## 🐞 Troubleshooting
+# 🐞 Troubleshooting
 
-### Calendar doesn't render  
+### Calendar does not render
+Check DevTools console for:
+- `window.SXCalendar not available`
+- `WidgetServiceSDK not available`
+- Connector errors (permalink, secrets, API base URL)
+
+### Events only show in Month view
+Connector timestamps **must include time**, e.g.:
+
+- Correct: `2025-11-06T01:00:00-07:00`
+- Incorrect: `2025-11-06`
+
+### Click does not open event  
 Check console:
-
-- `window.SXCalendar not available` → Schedule‑X CDN didn’t load  
-- `WidgetServiceSDK not available` → check CC script URL  
-- Connector errors → verify permalink & permissions  
-
-### Events only show in Month view  
-Ensure connector timestamps include **time**, e.g.:
-
-- Correct: `2025‑11‑06T01:00:00‑07:00`
-- Incorrect: `2025‑11‑06`
-
-### Clicks don’t open the right event  
-Check the console log:
 
 ```
 [GS CAL] onEventClick resolved URL: https://<domain>/events/<id>
 ```
 
-If the ID mapping changes in your connector, update the click handler.
+If payload changes, adjust the click handler accordingly.
 
 ---
 
-## 📁 Files Included
+# 📁 Files in This Folder
 
-| File | Purpose |
-|------|---------|
-| `calendar-brand-widget.html` | Calendar themed using **brand color** |
-| `calendar-cta-widget.html`   | Calendar themed using **CTA button color** |
-| `README.md`                  | Instructions & documentation |
-
----
-
-## 🧭 Roadmap (Future Options)
-
-- GitHub-hosted JS bundles (if CC allows full external JS execution reliably)  
-- Automatic sync with event filters on CC Events pages  
-- Optional dark‑mode or high‑contrast variants  
-
-For now, copy‑and‑paste widgets provide the most stable experience inside CC.
+| File | Description |
+|------|-------------|
+| `calendar-brand-widget.html` | Calendar themed with **brand color** |
+| `calendar-cta-widget.html`   | Calendar themed with **CTA color** |
+| `README.md`                  | This documentation |
 
 ---
 
-If you need refinements (animation, better date picker styling, stronger brand alignment, etc.) just ask!
+# 🧭 Roadmap (Future Enhancements)
+
+- Sync CC event filters with calendar  
+- Optionally host widget JS/CSS via GitHub Pages  
+- Dark mode version  
+- Multi-calendar support  
+
+If you want help extending the widget, improving UX, or supporting more CC theming, just ask!
