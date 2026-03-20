@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<!--
+  Product Switcher — Standalone Component
+  ========================================
+  Drop-in navigation header with a logo dropdown for switching between
+  multiple community "products" (sub-sites). Built for inSided/Khoros
+  platform custom headers but works in any context.
+
+  CONFIGURATION
+  -------------
+  Edit the two sections marked CONFIG:
+    1. PRODUCTS — define each community (key, label, url, logo images)
+    2. NAV_ITEMS per product — define the top-nav links and submenus
+
+  Role-gating: add a `roles: ['Role Name']` array to any nav item to
+  hide it from users who don't have that role (reads inSidedData.user.role).
+  Admins (super-admin, community-manager, etc.) always see all items.
+
+  localStorage key: 'selectedProduct'
+  Falls back to the first product in PRODUCTS if nothing is stored.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Product Switcher Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700&display=swap" rel="stylesheet">
+
+  <style>
+    /* ============================================================
+       PRODUCT SWITCHER — CSS
+       All classes are prefixed with .ps- to avoid collisions.
+       The wrapper uses .ps-header-wrapper as the outermost element.
+    ============================================================ */
+
+    .ps-header-wrapper {
+      width: 100%;
+      background: var(--config-main-navigation-background-color, #fff);
+      border-bottom: 1px solid var(--config-card-border-color, #e0e0e0);
+      font-family: 'Google Sans', sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      position: relative;
+      z-index: 11000;
+    }
+
+    /* Dark mode logo switching */
+    .ps-logo-dark { display: none; }
+    .dark-mode-enabled .ps-logo-light { display: none; }
+    .dark-mode-enabled .ps-logo-dark { display: inline; }
+
+    /* ---- Inner layout ---- */
+    .ps-header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 12px 20px;
+      display: grid;
+      grid-template-columns: auto auto 250px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    @media (max-width: 767px) {
+      .ps-header-inner {
+        grid-template-columns: auto auto 100px;
+      }
+    }
+
+    /* ---- Logo dropdown ---- */
+    .ps-logo-dropdown {
+      position: relative;
+      cursor: pointer;
+    }
+
+    .ps-logo-trigger {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .ps-logo-dropdown img {
+      height: 20px;
+      width: auto;
+    }
+
+    .ps-logo-dropdown svg {
+      width: 14px;
+      height: 14px;
+      fill: var(--config-main-navigation-nav-color, #333);
+    }
+
+    /* Dropdown menu (shown on hover) */
+    .ps-logo-menu {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      background: var(--config-main-navigation-background-color, white);
+      border: 1px solid var(--config-card-border-color, #e0e0e0);
+      border-radius: 4px;
+      box-shadow: var(--config-widget-box-shadow, 0 2px 8px rgba(0,0,0,.12));
+      z-index: 11001;
+      min-width: 260px;
+      white-space: nowrap;
+    }
+
+    .dark-mode-enabled .ps-logo-menu {
+      background: var(--config--main-color-night-light, #2a2a2a);
+    }
+
+    .ps-logo-menu a {
+      display: block;
+      padding: 10px 14px;
+      text-decoration: none;
+      color: var(--config-main-navigation-nav-color, #333);
+      border-bottom: 2px solid transparent;
+    }
+
+    .ps-logo-menu a:hover {
+      border-bottom-color: var(--config-main-navigation-nav-color, #333);
+    }
+
+    .dark-mode-enabled .ps-logo-menu a {
+      color: var(--config-main-navigation-nav-color, #fff);
+    }
+
+    .ps-logo-dropdown:hover .ps-logo-menu {
+      display: block;
+    }
+
+    /* ---- Top nav links ---- */
+    .ps-nav-links {
+      flex: 1;
+      text-align: center;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .ps-nav-links .ps-menu-item {
+      position: relative;
+    }
+
+    .ps-nav-links .ps-menu-item > a {
+      text-decoration: none;
+      color: var(--config-main-navigation-nav-color, #333);
+      font-weight: 600;
+      margin: 6px 8px 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-bottom: 2px solid transparent;
+    }
+
+    .ps-nav-links .ps-menu-item:hover > a {
+      border-bottom-color: var(--config-main-navigation-nav-color, #333);
+    }
+
+    .ps-nav-links .ps-menu-item svg {
+      width: 12px;
+      height: 12px;
+      fill: currentColor;
+    }
+
+    /* First-level submenu */
+    .ps-nav-links .ps-submenu {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      background: var(--config-main-navigation-background-color, white);
+      border: 1px solid var(--config-card-border-color, #e0e0e0);
+      box-shadow: var(--config-widget-box-shadow, 0 2px 8px rgba(0,0,0,.12));
+      min-width: 200px;
+      z-index: 11001;
+      padding: 4px 0;
+      border-radius: 4px;
+      text-align: left;
+    }
+
+    .ps-nav-links .ps-submenu a {
+      display: inline-block;
+      padding: 10px 14px;
+      text-decoration: none;
+      color: var(--config-main-navigation-nav-color, #333);
+      white-space: nowrap;
+    }
+
+    .dark-mode-enabled .ps-nav-links .ps-submenu {
+      background: var(--config--main-color-night-light, #2a2a2a);
+    }
+
+    .ps-nav-links .ps-menu-item:hover .ps-submenu {
+      display: block;
+    }
+
+    /* Second-level subdropdown */
+    .ps-nav-links .ps-submenu .ps-submenu-item {
+      position: relative;
+    }
+
+    .ps-nav-links .ps-submenu .ps-submenu-item > a {
+      padding: 0;
+      margin: 10px 14px 8px;
+      text-decoration: none;
+      color: var(--config-main-navigation-nav-color, #333);
+      white-space: nowrap;
+      font-weight: 500;
+      border-bottom: 2px solid transparent;
+    }
+
+    .ps-nav-links .ps-submenu .ps-submenu-item > a:hover {
+      border-bottom-color: var(--config-main-navigation-nav-color, #333);
+    }
+
+    .dark-mode-enabled .ps-nav-links .ps-submenu .ps-submenu-item > a {
+      color: var(--config-main-navigation-nav-color, #fff);
+    }
+
+    .ps-nav-links .ps-submenu .ps-subdropdown {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 100%;
+      background: var(--config-main-navigation-background-color, white);
+      border: 1px solid var(--config-card-border-color, #e0e0e0);
+      box-shadow: var(--config-widget-box-shadow, 0 2px 8px rgba(0,0,0,.12));
+      min-width: 200px;
+      z-index: 11002;
+      padding: 4px 0;
+      border-radius: 4px;
+    }
+
+    .dark-mode-enabled .ps-nav-links .ps-submenu .ps-subdropdown {
+      background: var(--config--main-color-night-light, #2a2a2a);
+    }
+
+    .ps-nav-links .ps-submenu .ps-submenu-item:hover .ps-subdropdown {
+      display: block;
+    }
+
+    /* ---- Hamburger button (mobile) ---- */
+    .ps-hamburger-btn {
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      width: 30px;
+      height: 30px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      margin-right: 15px;
+    }
+
+    .ps-hamburger-btn span {
+      display: block;
+      width: 20px;
+      height: 2px;
+      background: var(--config-main-navigation-nav-color, #333);
+      margin: 2px 0;
+      transition: 0.3s;
+    }
+
+    /* ---- Mobile panel ---- */
+    .ps-mobile-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: transparent;
+      z-index: 10999;
+    }
+
+    .ps-mobile-panel {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 340px;
+      max-width: 85vw;
+      height: 100%;
+      background: var(--config-main-navigation-background-color, white);
+      box-shadow: var(--config-widget-box-shadow, 2px 0 12px rgba(0,0,0,.15));
+      z-index: 11000;
+      overflow-y: auto;
+      transform: translateX(-100%);
+      transition: transform 0s ease;
+    }
+
+    .dark-mode-enabled .ps-mobile-panel {
+      background: var(--config--main-color-night-light, #2a2a2a);
+    }
+
+    .ps-mobile-panel.active {
+      transform: translateX(0);
+      transition: transform .3s ease;
+    }
+
+    .ps-mobile-topbar {
+      display: flex;
+      align-items: center;
+      padding: 16px 20px;
+      gap: 12px;
+    }
+
+    .ps-mobile-close-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+    }
+
+    .ps-mobile-close-btn svg {
+      width: 22px; height: 22px;
+      fill: var(--config-main-navigation-nav-color, #333);
+    }
+
+    .ps-mobile-content { padding: 0; }
+
+    .ps-mobile-item { display: block; width: 100%; }
+
+    .ps-mobile-item-row {
+      display: flex;
+      align-items: center;
+      width: 100%;
+    }
+
+    .ps-mobile-item-row > .ps-mobile-link-wrap {
+      flex: 1;
+      padding: 16px 20px 14px;
+    }
+
+    .ps-mobile-item-row > .ps-mobile-link-wrap > a {
+      display: inline-block;
+      text-decoration: none;
+      color: var(--config-main-navigation-nav-link-color, #333);
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: 2px solid transparent;
+    }
+
+    .ps-mobile-item-row > .ps-mobile-link-wrap > a:hover {
+      border-bottom-color: var(--config-main-navigation-nav-color, #333);
+    }
+
+    .ps-mobile-chevron-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+    }
+
+    .ps-mobile-chevron-btn svg {
+      width: 16px; height: 16px;
+      fill: var(--config-meta-text-color, #666);
+      transition: transform 0.25s ease;
+    }
+
+    .ps-mobile-chevron-btn.expanded svg { transform: rotate(0deg); }
+    .ps-mobile-chevron-btn:not(.expanded) svg { transform: rotate(-90deg); }
+
+    .ps-mobile-submenu-list { display: none; padding: 0 0 8px; }
+    .ps-mobile-submenu-list.open { display: block; }
+
+    .ps-mobile-sub-item { display: block; width: 100%; }
+
+    .ps-mobile-sub-item > a {
+      display: inline-block;
+      padding: 10px 0 8px;
+      margin-left: 40px;
+      text-decoration: none;
+      color: var(--config-main-navigation-nav-color, #333);
+      font-size: 14px;
+      font-weight: 500;
+      border-bottom: 2px solid transparent;
+    }
+
+    .ps-mobile-sub-item > a:hover {
+      border-bottom-color: var(--config-main-navigation-nav-color, #333);
+    }
+
+    .ps-mobile-sub-item-row {
+      display: flex;
+      align-items: center;
+      width: 100%;
+    }
+
+    .ps-mobile-sub-item-row > a {
+      flex: 1;
+      display: inline-block;
+      padding: 10px 0 8px;
+      margin-left: 40px;
+      text-decoration: none;
+      color: var(--config-main-navigation-nav-color, #333);
+      font-size: 14px;
+      font-weight: 500;
+      border-bottom: 2px solid transparent;
+    }
+
+    .ps-mobile-sub-item-row > a:hover {
+      border-bottom-color: var(--config-main-navigation-nav-color, #333);
+    }
+
+    .ps-mobile-sub-item-row .ps-mobile-chevron-btn { padding: 10px 16px; }
+
+    .ps-mobile-subdropdown-list { display: none; padding: 0 0 4px; }
+    .ps-mobile-subdropdown-list.open { display: block; }
+
+    .ps-mobile-subsub-item { display: block; width: 100%; }
+
+    .ps-mobile-subsub-item > a {
+      display: inline-block;
+      padding: 8px 0 6px;
+      margin-left: 60px;
+      text-decoration: none;
+      color: var(--config-meta-text-color, #666);
+      font-size: 13px;
+      font-weight: 500;
+      border-bottom: 2px solid transparent;
+    }
+
+    .ps-mobile-subsub-item > a:hover {
+      border-bottom-color: var(--config-main-navigation-nav-color, #333);
+    }
+
+    /* ---- Responsive breakpoints ---- */
+    @media (max-width: 1140px) {
+      .ps-header-inner {
+        padding: 14px 15px;
+        justify-content: flex-start;
+      }
+      .ps-hamburger-btn { display: flex; }
+      .ps-nav-links { display: none; }
+      .ps-mobile-panel { display: block; }
+      .ps-mobile-overlay.active { display: block; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Mount point: place this div wherever the header should render -->
+  <div id="ps-container"></div>
+
+  <script>
+  (function () {
+
+    /* =================================================================
+       CONFIG — SECTION 1: Products
+       Define each community/product that appears in the logo dropdown.
+       - key:   unique identifier stored in localStorage
+       - label: display text in the dropdown
+       - url:   destination when user clicks this option
+       - logo:  { src, srcDark, alt } — use srcDark for dark-mode variant
+    ================================================================= */
+    const PRODUCTS = [
+      {
+        key: 'product-a',
+        label: 'Product A Community',
+        url: 'https://your-community.example.com/',
+        logo: {
+          src: 'https://via.placeholder.com/120x20?text=Product+A',
+          srcDark: 'https://via.placeholder.com/120x20/000/fff?text=Product+A',
+          alt: 'Product A'
+        }
+      },
+      {
+        key: 'product-b',
+        label: 'Product B Community',
+        url: 'https://your-community.example.com/p/product-b',
+        logo: {
+          src: 'https://via.placeholder.com/120x20?text=Product+B',
+          srcDark: 'https://via.placeholder.com/120x20/000/fff?text=Product+B',
+          alt: 'Product B'
+        }
+      },
+      {
+        key: 'product-c',
+        label: 'Product C Community',
+        url: 'https://your-community.example.com/p/product-c',
+        logo: {
+          src: 'https://via.placeholder.com/120x20?text=Product+C',
+          srcDark: 'https://via.placeholder.com/120x20/000/fff?text=Product+C',
+          alt: 'Product C'
+        }
+      }
+    ];
+
+    /* =================================================================
+       CONFIG — SECTION 2: Nav items per product
+       Key must match a PRODUCTS[].key above.
+       Each navItem: { text, href, roles?, submenu? }
+       Each submenu item can itself have a submenu (one level deep).
+       roles: array of role strings — item is hidden unless user has one.
+    ================================================================= */
+    const NAV_CONFIGS = {
+      'product-a': [
+        {
+          text: 'Discussions',
+          href: '/discussions',
+          submenu: [
+            { text: 'General', href: '/general' },
+            { text: 'Off-topic', href: '/off-topic' }
+          ]
+        },
+        {
+          text: 'Resources',
+          href: '/resources',
+          submenu: [
+            {
+              text: 'Guides',
+              href: '/guides',
+              submenu: [
+                { text: 'Getting started', href: '/getting-started' },
+                { text: 'Best practices', href: '/best-practices' }
+              ]
+            },
+            { text: 'Stories', href: '/stories' }
+          ]
+        },
+        {
+          text: 'Members Only',
+          href: '/members-area',
+          roles: ['Member', 'VIP']  // hidden unless user has one of these roles
+        },
+        { text: 'Events', href: '/events' }
+      ],
+      'product-b': [
+        { text: 'Discussions', href: '/discussions' },
+        { text: 'Resources', href: '/resources' },
+        { text: 'Events', href: '/events' }
+      ],
+      'product-c': [
+        { text: 'Discussions', href: '/discussions' },
+        { text: 'Events', href: '/events' }
+      ]
+    };
+
+    /* =================================================================
+       CONFIG — SECTION 3: URL-to-product mapping
+       Maps URL pathnames to product keys so the correct product is
+       auto-selected on page load, regardless of localStorage state.
+       Add one entry per community landing page.
+    ================================================================= */
+    const URL_MAP = {
+      '/':                      'product-a',
+      '/p/product-b':           'product-b',
+      '/p/product-c':           'product-c'
+    };
+
+    /* =================================================================
+       CONFIG — SECTION 4: Admin roles
+       Users with any of these roles bypass all role checks.
+    ================================================================= */
+    const ADMIN_ROLES = [
+      'roles.super-admin',
+      'roles.community-manager',
+      'roles.administrator',
+      'roles.super-user'
+    ];
+
+    /* =================================================================
+       INTERNALS — do not edit below unless extending behaviour
+    ================================================================= */
+
+    const CHEVRON_DOWN = `<svg viewBox="0 0 24 24"><path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z"></path></svg>`;
+    const CLOSE_ICON  = `<svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>`;
+
+    // inSidedData shim — when running outside the platform, treat as logged-out guest
+    const userData = (typeof inSidedData !== 'undefined' && inSidedData.user)
+      ? inSidedData.user
+      : { role: '' };
+
+    function getUserRoles() {
+      return userData.role ? userData.role.split(',').map(r => r.trim()) : [];
+    }
+
+    function isAdmin() {
+      const roles = getUserRoles();
+      return ADMIN_ROLES.some(r => roles.includes(r));
+    }
+
+    function userCanSee(requiredRoles) {
+      if (!requiredRoles || requiredRoles.length === 0) return true;
+      if (isAdmin()) return true;
+      const userRoles = getUserRoles();
+      return requiredRoles.some(r => userRoles.includes(r));
+    }
+
+    /* --- Desktop menu item builder --- */
+    function buildDesktopItem(item, isNested) {
+      if (!userCanSee(item.roles)) return null;
+
+      const visibleChildren = item.submenu
+        ? item.submenu.map(c => buildDesktopItem(c, true)).filter(Boolean)
+        : [];
+
+      const wrapper = document.createElement('div');
+      wrapper.className = isNested ? 'ps-submenu-item' : 'ps-menu-item';
+
+      const link = document.createElement('a');
+      link.href = item.href || '#';
+      link.textContent = item.text;
+
+      if (visibleChildren.length > 0) {
+        link.textContent += ' ';
+        const icon = document.createElement('span');
+        icon.innerHTML = CHEVRON_DOWN;
+        link.appendChild(icon.firstElementChild);
+      }
+
+      wrapper.appendChild(link);
+
+      if (visibleChildren.length > 0) {
+        const menu = document.createElement('div');
+        menu.className = isNested ? 'ps-subdropdown' : 'ps-submenu';
+        visibleChildren.forEach(child => menu.appendChild(child));
+        wrapper.appendChild(menu);
+      }
+
+      return wrapper;
+    }
+
+    /* --- Mobile menu item builder --- */
+    function buildMobileItem(item) {
+      if (!userCanSee(item.roles)) return null;
+
+      const visibleChildren = item.submenu
+        ? item.submenu.filter(c => userCanSee(c.roles))
+        : [];
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'ps-mobile-item';
+
+      const row = document.createElement('div');
+      row.className = 'ps-mobile-item-row';
+
+      const linkWrap = document.createElement('div');
+      linkWrap.className = 'ps-mobile-link-wrap';
+      const link = document.createElement('a');
+      link.href = item.href || '#';
+      link.textContent = item.text;
+      linkWrap.appendChild(link);
+      row.appendChild(linkWrap);
+
+      if (visibleChildren.length > 0) {
+        const chevronBtn = document.createElement('button');
+        chevronBtn.className = 'ps-mobile-chevron-btn';
+        chevronBtn.innerHTML = CHEVRON_DOWN;
+        row.appendChild(chevronBtn);
+      }
+
+      wrapper.appendChild(row);
+
+      if (visibleChildren.length > 0) {
+        const subList = document.createElement('div');
+        subList.className = 'ps-mobile-submenu-list';
+
+        visibleChildren.forEach(subItem => {
+          if (!userCanSee(subItem.roles)) return;
+          const hasGrandchildren = subItem.submenu && subItem.submenu.length > 0;
+
+          if (hasGrandchildren) {
+            const subRow = document.createElement('div');
+            subRow.className = 'ps-mobile-sub-item-row';
+
+            const subLink = document.createElement('a');
+            subLink.href = subItem.href || '#';
+            subLink.textContent = subItem.text;
+            subRow.appendChild(subLink);
+
+            const subChevron = document.createElement('button');
+            subChevron.className = 'ps-mobile-chevron-btn';
+            subChevron.innerHTML = CHEVRON_DOWN;
+            subRow.appendChild(subChevron);
+            subList.appendChild(subRow);
+
+            const subSubList = document.createElement('div');
+            subSubList.className = 'ps-mobile-subdropdown-list';
+
+            subItem.submenu.forEach(leaf => {
+              if (!userCanSee(leaf.roles)) return;
+              const leafWrap = document.createElement('div');
+              leafWrap.className = 'ps-mobile-subsub-item';
+              const leafLink = document.createElement('a');
+              leafLink.href = leaf.href || '#';
+              leafLink.textContent = leaf.text;
+              leafWrap.appendChild(leafLink);
+              subSubList.appendChild(leafWrap);
+            });
+
+            subList.appendChild(subSubList);
+          } else {
+            const subItemWrap = document.createElement('div');
+            subItemWrap.className = 'ps-mobile-sub-item';
+            const subLink = document.createElement('a');
+            subLink.href = subItem.href || '#';
+            subLink.textContent = subItem.text;
+            subItemWrap.appendChild(subLink);
+            subList.appendChild(subItemWrap);
+          }
+        });
+
+        wrapper.appendChild(subList);
+      }
+
+      return wrapper;
+    }
+
+    /* --- Full header builder --- */
+    function buildHeader(productKey) {
+      const product = PRODUCTS.find(p => p.key === productKey);
+      if (!product) return null;
+      const navItems = NAV_CONFIGS[productKey] || [];
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'ps-header-wrapper';
+
+      const inner = document.createElement('div');
+      inner.className = 'ps-header-inner';
+      wrapper.appendChild(inner);
+
+      /* Hamburger */
+      const hamburger = document.createElement('button');
+      hamburger.className = 'ps-hamburger-btn';
+      hamburger.setAttribute('aria-label', 'Toggle menu');
+      hamburger.innerHTML = '<span></span><span></span><span></span>';
+      inner.appendChild(hamburger);
+
+      /* Logo dropdown */
+      const logoDropdown = document.createElement('div');
+      logoDropdown.className = 'ps-logo-dropdown';
+
+      const logoTrigger = document.createElement('div');
+      logoTrigger.className = 'ps-logo-trigger';
+
+      const logoLight = document.createElement('img');
+      logoLight.src = product.logo.src;
+      logoLight.alt = product.logo.alt;
+      logoLight.className = 'ps-logo-light';
+      logoTrigger.appendChild(logoLight);
+
+      const logoDark = document.createElement('img');
+      logoDark.src = product.logo.srcDark;
+      logoDark.alt = product.logo.alt;
+      logoDark.className = 'ps-logo-dark';
+      logoTrigger.appendChild(logoDark);
+
+      const chevronDiv = document.createElement('span');
+      chevronDiv.innerHTML = CHEVRON_DOWN;
+      logoTrigger.appendChild(chevronDiv.firstElementChild);
+
+      logoDropdown.appendChild(logoTrigger);
+
+      const logoMenu = document.createElement('div');
+      logoMenu.className = 'ps-logo-menu';
+      PRODUCTS.forEach(p => {
+        const a = document.createElement('a');
+        a.href = '#';
+        a.textContent = p.label;
+        a.dataset.productKey = p.key;
+        a.dataset.productUrl = p.url;
+        logoMenu.appendChild(a);
+      });
+      logoDropdown.appendChild(logoMenu);
+      inner.appendChild(logoDropdown);
+
+      /* Desktop nav */
+      const navLinks = document.createElement('div');
+      navLinks.className = 'ps-nav-links';
+      navItems.forEach(item => {
+        const el = buildDesktopItem(item, false);
+        if (el) navLinks.appendChild(el);
+      });
+      inner.appendChild(navLinks);
+
+      /* Mobile overlay + panel */
+      const overlay = document.createElement('div');
+      overlay.className = 'ps-mobile-overlay';
+
+      const panel = document.createElement('div');
+      panel.className = 'ps-mobile-panel';
+
+      const topBar = document.createElement('div');
+      topBar.className = 'ps-mobile-topbar';
+
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'ps-mobile-close-btn';
+      closeBtn.setAttribute('aria-label', 'Close menu');
+      closeBtn.innerHTML = CLOSE_ICON;
+      topBar.appendChild(closeBtn);
+      panel.appendChild(topBar);
+
+      const mobileContent = document.createElement('div');
+      mobileContent.className = 'ps-mobile-content';
+      navItems.forEach(item => {
+        const el = buildMobileItem(item);
+        if (el) mobileContent.appendChild(el);
+      });
+      panel.appendChild(mobileContent);
+
+      wrapper.appendChild(overlay);
+      wrapper.appendChild(panel);
+
+      return { wrapper, hamburger, overlay, panel, closeBtn };
+    }
+
+    /* --- Render and wire events --- */
+    function renderHeader(productKey) {
+      const container = document.getElementById('ps-container');
+      if (!container) return;
+
+      const result = buildHeader(productKey);
+      if (!result) return;
+
+      container.innerHTML = '';
+      container.appendChild(result.wrapper);
+
+      /* Logo dropdown: switch product on click */
+      result.wrapper.querySelectorAll('.ps-logo-menu a').forEach(link => {
+        link.addEventListener('click', function (e) {
+          e.preventDefault();
+          const key = this.dataset.productKey;
+          const url = this.dataset.productUrl;
+          localStorage.setItem('selectedProduct', key);
+          window.location.href = url;
+        });
+      });
+
+      /* Mobile open/close */
+      function openMenu() {
+        result.overlay.classList.add('active');
+        result.panel.classList.add('active');
+      }
+      function closeMenu() {
+        result.overlay.classList.remove('active');
+        result.panel.classList.remove('active');
+      }
+
+      result.hamburger.addEventListener('click', openMenu);
+      result.closeBtn.addEventListener('click', closeMenu);
+      result.overlay.addEventListener('click', closeMenu);
+
+      /* Close panel when a nav link is tapped */
+      result.panel.addEventListener('click', function (e) {
+        if (e.target.tagName === 'A') closeMenu();
+      });
+
+      /* Chevron toggles — top-level */
+      result.panel.querySelectorAll(
+        '.ps-mobile-item > .ps-mobile-item-row > .ps-mobile-chevron-btn'
+      ).forEach(btn => {
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          const item = this.closest('.ps-mobile-item');
+          if (!item) return;
+          const subList = item.querySelector(':scope > .ps-mobile-submenu-list');
+          if (subList) {
+            const open = subList.classList.toggle('open');
+            this.classList.toggle('expanded', open);
+          }
+        });
+      });
+
+      /* Chevron toggles — second level */
+      result.panel.querySelectorAll(
+        '.ps-mobile-sub-item-row > .ps-mobile-chevron-btn'
+      ).forEach(btn => {
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          const subRow = this.closest('.ps-mobile-sub-item-row');
+          if (!subRow) return;
+          const subDrop = subRow.nextElementSibling;
+          if (subDrop && subDrop.classList.contains('ps-mobile-subdropdown-list')) {
+            const open = subDrop.classList.toggle('open');
+            this.classList.toggle('expanded', open);
+          }
+        });
+      });
+    }
+
+    /* --- Init on DOMContentLoaded --- */
+    document.addEventListener('DOMContentLoaded', function () {
+      const path = window.location.pathname;
+
+      // Resolve product from URL first, fall back to localStorage, then first product
+      const selectedKey =
+        URL_MAP[path] ||
+        localStorage.getItem('selectedProduct') ||
+        PRODUCTS[0].key;
+
+      localStorage.setItem('selectedProduct', selectedKey);
+      renderHeader(selectedKey);
+    });
+
+  })();
+  </script>
+
+</body>
+</html>
